@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Networth Tracker</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#111827;--mu:#6b7280;--ac:#0f766e;--bd:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1117;--card:#151c24;--tx:#e5e7eb;--mu:#94a3b8;--ac:#2dd4bf;--bd:#26313d}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);padding-bottom:70px}
+header{padding:16px;font-size:20px;font-weight:700;text-align:center}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:10px 12px;padding:14px}
+.big{font-size:28px;font-weight:700;color:var(--ac)}.mu{color:var(--mu);font-size:13px}
+label{display:block;font-size:13px;color:var(--mu);margin-top:10px}
+input{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:12px}
+.pc{font-size:11px;color:var(--mu);margin-left:6px}.pc.up{color:#16a34a}.pc.dn{color:#dc2626}
+.row{display:flex;gap:8px;align-items:end}.row>div{flex:1}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:11px 16px;font-size:15px;font-weight:600}
+button.s{background:transparent;color:var(--ac);border:1px solid var(--ac)}button.d{background:#dc2626;padding:6px 10px;font-size:12px}
+button.w{width:100%;margin-top:12px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd)}
+nav button{font-size:13px;flex:1;background:none;color:var(--mu);border-radius:0;padding:14px 0}nav button.on{color:var(--ac);border-top:2px solid var(--ac)}
+.h{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}
+.h:last-child{border:0}.hide{display:none}svg{width:100%;height:auto}
+#lock{padding:24px;margin-top:40px}
+.mk{display:flex;flex-wrap:wrap;gap:8px;margin:0 12px}.mk>div{flex:1 1 40%;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px}
+.mk b{display:block;font-size:15px;margin-top:2px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.chip{background:var(--c);color:#fff;padding:6px 12px;font-size:13px;border-radius:16px}.chip.off{background:transparent;color:var(--mu);border:1px solid var(--bd);text-decoration:line-through}
+.up{color:#16a34a}.dn{color:#dc2626}
+</style></head><body>
+<div id="lock" class="c"><h2 id="lt">Net Worth</h2><p class="mu" id="lm"></p>
+<input id="pw" type="password" placeholder="Passphrase" autocomplete="off">
+<input id="pw2" type="password" placeholder="Confirm passphrase" class="hide" style="margin-top:8px">
+<button class="w" onclick="unlock()">Continue</button><button class="w s hide" id="bio" onclick="bioUnlock()">Unlock with fingerprint</button><p id="le" style="color:#dc2626"></p></div>
+
+<div id="app" class="hide">
+<header>Networth Tracker</header>
+<div id="u">
+ <div id="clk" style="text-align:center;font-size:15px;font-weight:600;padding:2px 12px 10px;font-variant-numeric:tabular-nums"></div>
+ <div class="mk" id="mk" onclick="loadMkt()"></div><div class="mu" id="mkt" style="margin:4px 14px 0">Tap to refresh</div>
+ <div class="c"><div class="mu">Current total</div><div class="big" id="tot">₹0</div><div class="mu" id="last"></div></div>
+ <div class="c"><div id="form"></div>
+  <div class="mu" style="margin-top:10px">Leave a box empty to keep its previous value.</div>
+  <button class="w" onclick="save()">Save snapshot</button></div></div>
+<div id="g" class="hide"><div class="c"><div id="chips" class="chips"></div><div id="chart"></div><div id="lg" class="mu" style="margin-top:6px"></div></div></div>
+<div id="hi" class="hide"><div class="c" id="hist"></div></div>
+<div id="b" class="hide"><div class="c"><b>Encrypted backup</b><p class="mu">Export a file encrypted with your passphrase. Keep it safe (Drive, laptop). Import it after an app upgrade or on a new phone. The backup format is fixed and stays compatible with every app version.</p>
+ <button class="w" onclick="exp()">Export backup</button>
+ <label>Import backup</label><input type="file" id="f" accept=".nwbak,application/json">
+ <input id="bp" type="password" placeholder="Backup passphrase" style="margin-top:8px">
+ <button class="w s" onclick="imp()">Import &amp; replace data</button><p id="bm" class="mu"></p></div></div>
+<div id="ad" class="hide"><div class="c"><b>Manage fields</b><p class="mu">Fields shown on the Update tab. Renaming keeps your history; removing a field only hides it from the form.</p>
+ <div class="row"><div><input id="nn" placeholder="New field name (e.g. Gold)"></div><button onclick="addI()">Add</button></div></div>
+ <div class="c" id="alist"></div>
+ <div class="c"><b>Fingerprint unlock</b><p class="mu" id="bs"></p><button class="w" id="bb" onclick="bioToggle()"></button></div></div>
+<nav><button class="on" data-t="u">Update</button><button data-t="g">Graph</button><button data-t="hi">History</button><button data-t="b">Backup</button><button data-t="ad">Admin</button></nav>
+</div>
+<script>
+const E=new TextEncoder(),D=new TextDecoder(),K='nw_vault';
+const b64=a=>btoa(String.fromCharCode(...new Uint8Array(a))),ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+let S,pass,salt;
+const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+async function dk(p,s,it){const m=await crypto.subtle.importKey('raw',E.encode(p),'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({name:'PBKDF2',salt:s,iterations:it||250000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function seal(o,p,s){const iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},await dk(p,s,250000),E.encode(JSON.stringify(o)));
+ return JSON.stringify({fmt:'networth-backup',v:1,kdf:'PBKDF2-SHA256',it:250000,ciph:'AES-GCM',salt:b64(s),iv:b64(iv),ct:b64(ct)})}
+/* BACKUP FORMAT (fixed, v1): envelope {fmt,v,kdf,it,ciph,salt,iv,ct}; ct = AES-256-GCM(JSON payload), key = PBKDF2-SHA256(passphrase,salt,it).
+   Payload rule: keys are only ever ADDED, never renamed/removed; fixData() fills defaults for older files. Old files without fmt/it are v1 with it=250000. */
+function fixData(d){d=d&&typeof d==='object'?d:{};if(!Array.isArray(d.instruments))d.instruments=[];if(!Array.isArray(d.entries))d.entries=[];
+ d.entries=d.entries.filter(e=>e&&e.ts).map(e=>{e.values=e.values&&typeof e.values==='object'?e.values:{};if(typeof e.total!=='number')e.total=Object.values(e.values).reduce((a,b)=>a+(+b||0),0);return e}).sort((a,b)=>a.ts-b.ts);return d}
+async function open(str,p){const o=JSON.parse(str),s=ub(o.salt);if(o.v>1)throw new Error('newer');
+ const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.iv)},await dk(p,s,o.it),ub(o.ct));
+ return{data:fixData(JSON.parse(D.decode(pt))),salt:s}}
+async function persist(){localStorage.setItem(K,await seal(S,pass,salt))}
+const $=id=>document.getElementById(id);
+const v=localStorage.getItem(K);
+$('lm').textContent=v?'Enter your passphrase to unlock.':'First launch: set a passphrase. It cannot be recovered if forgotten — keep backups.';
+if(!v){$('pw2').classList.remove('hide')}
+async function unlock(){const p=$('pw').value;$('le').textContent='';
+ if(!p||p.length<6){$('le').textContent='Use at least 6 characters.';return}
+ try{
+  if(v){const r=await open(v,p);S=r.data;salt=r.salt}
+  else{if(p!==$('pw2').value){$('le').textContent='Passphrases do not match.';return}
+   S={instruments:['PF','PPF','Geojit','Upstox','NPS','SunCrypto','APY','FD'],entries:[],gv:2};salt=crypto.getRandomValues(new Uint8Array(16));pass=p;await persist()}
+  pass=p;await migrate();$('lock').classList.add('hide');$('app').classList.remove('hide');render();loadMkt();
+ }catch(e){$('le').textContent='Wrong passphrase or corrupted data.'}}
+function lastVals(){return S.entries.length?S.entries[S.entries.length-1].values:{}}
+function render(){const lv=lastVals();
+ $('form').innerHTML=S.instruments.map((n,i)=>`<label>${esc(n)}<span class="pc" id="pc${i}"></span></label><input inputmode="decimal" data-n="${esc(n)}" value="" oninput="sum()">`).join('');
+ adm();sum();const l=S.entries[S.entries.length-1];$('last').textContent=l?'Last saved: '+new Date(l.ts).toLocaleString():'No snapshots yet';
+ hist();chart()}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function read(){const o={},lv=lastVals();document.querySelectorAll('#form input').forEach(i=>{o[i.dataset.n]=i.value.trim()===''?(lv[i.dataset.n]||0):(parseFloat(i.value)||0)});return o}
+function sum(){const lv=lastVals();let t=0;
+ document.querySelectorAll('#form input').forEach((inp,i)=>{const c=parseFloat(inp.value)||0;const pv=lv[inp.dataset.n],el=$('pc'+i);if(!el)return;
+  if(!(pv>0)){el.className='pc';el.textContent='new';return}
+  if(inp.value===''){el.className='pc';el.textContent='('+fmt(pv)+')';return}
+  const d=(c-pv)/pv*100;el.className='pc';el.innerHTML='('+fmt(pv)+') <span class="'+(d>0?'up':d<0?'dn':'')+'">'+(d>0?'▲ ':d<0?'▼ ':'')+Math.abs(d).toFixed(2)+'%</span>'});
+ $('tot').textContent=fmt(Object.values(read()).reduce((a,b)=>a+b,0))}
+async function addI(){const n=$('nn').value.trim();if(!n||S.instruments.includes(n))return;S.instruments.push(n);$('nn').value='';await persist();render()}
+function adm(){bioUi();$('alist').innerHTML=S.instruments.length?S.instruments.map((n,i)=>`<div class="h"><b>${esc(n)}</b><span style="white-space:nowrap"><button class="s" style="padding:6px 9px" onclick="mv(${i},-1)">↑</button> <button class="s" style="padding:6px 9px" onclick="mv(${i},1)">↓</button> <button class="s" style="padding:6px 9px" onclick="ren(${i})">Edit</button> <button class="d" onclick="rmI(${i})">Remove</button></span></div>`).join(''):'<span class="mu">No fields yet. Add one above.</span>'}
+async function mv(i,d){const j=i+d;if(j<0||j>=S.instruments.length)return;[S.instruments[i],S.instruments[j]]=[S.instruments[j],S.instruments[i]];await persist();render()}
+async function ren(i){const old=S.instruments[i],n=(prompt('Rename field',old)||'').trim();if(!n||n===old)return;
+ if(S.instruments.includes(n)){alert('A field with that name already exists.');return}
+ S.entries.forEach(e=>{if(old in e.values){e.values[n]=e.values[old];delete e.values[old]}});S.instruments[i]=n;await persist();render()}
+async function rmI(i){if(!confirm('Remove '+S.instruments[i]+' from the form? Past history is kept.'))return;S.instruments.splice(i,1);await persist();render()}
+async function save(){await loadMkt();const values=read();const mkt={sx:sd(MK.sx?.t)?MK.sx.p:null,nf:sd(MK.nf?.t)?MK.nf.p:null,usd:sd(MK.ut)?MK.usd:null,gold:sd(MK.gt)?MK.gold:null};S.entries.push({ts:Date.now(),values,total:Object.values(values).reduce((a,b)=>a+b,0),mkt});await persist();render();alert('Saved')}
+function hist(){$('hist').innerHTML=S.entries.length?[...S.entries].reverse().map((e,i)=>{const idx=S.entries.length-1-i;
+ return `<div class="h"><div><b>${fmt(e.total)}</b><div class="mu">${new Date(e.ts).toLocaleString()}</div>${mline(e)}</div><button class="d" onclick="del(${idx})">Delete</button></div>`}).join(''):'<span class="mu">No history yet.</span>'}
+function mline(e){const m=e.mkt;if(!m)return'';const f=(n,v,d)=>v?n+' '+v.toLocaleString('en-IN',{maximumFractionDigits:d}):'';return`<div class="mu" style="font-size:11px">${[f('Nifty',m.nf,0),f('Sensex',m.sx,0),f('USD',m.usd,2),f('Gold',m.gold,0)].filter(Boolean).join(' · ')}</div>`}
+async function del(i){if(!confirm('Delete this snapshot?'))return;S.entries.splice(i,1);await persist();render()}
+const SER=[['nw','Net worth','#14b8a6',e=>e.total],['nf','Nifty','#f97316',e=>e.mkt&&e.mkt.nf],['sx','Sensex','#3b82f6',e=>e.mkt&&e.mkt.sx],['usd','USD/INR','#a855f7',e=>e.mkt&&e.mkt.usd],['gd','Gold','#eab308',e=>e.mkt&&e.mkt.gold]];
+let HID=new Set();try{HID=new Set(JSON.parse(localStorage.getItem('nw_hid')||'[]'))}catch(e){}
+function tog(k){HID.has(k)?HID.delete(k):HID.add(k);localStorage.setItem('nw_hid',JSON.stringify([...HID]));chart()}
+function chart(){const e=S.entries;
+ $('chips').innerHTML=SER.map(([k,n,c])=>`<button class="chip ${HID.has(k)?'off':''}" style="--c:${c}" onclick="tog('${k}')">${n}</button>`).join('');
+ const vis=SER.filter(x=>!HID.has(x[0])).map(x=>({n:x[1],c:x[2],pts:e.map(y=>[y.ts,x[3](y)]).filter(q=>q[1]>0)})).filter(x=>x.pts.length);
+ if(!e.length||!vis.length){$('chart').innerHTML='<p class="mu">'+(e.length?'Turn on a series above.':'Save a snapshot to see the graph.')+'</p>';$('lg').textContent='';return}
+ const ind=vis.length>1;vis.forEach(x=>x.pl=x.pts.map(([t,v])=>[t,ind?v/x.pts[0][1]*100:v]));
+ const W=340,H=230,L=52,R=12,T=14,B=30,xs=vis.flatMap(x=>x.pl.map(q=>q[0])),ys=vis.flatMap(x=>x.pl.map(q=>q[1]));
+ let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+ if(x0==x1){x0-=864e5;x1+=864e5}if(y0==y1){y0*=.95;y1=y1*1.05||1}const pad=(y1-y0)*.1;y0-=pad;y1+=pad;
+ const X=t=>L+(t-x0)/(x1-x0)*(W-L-R),Y=y=>T+(1-(y-y0)/(y1-y0))*(H-T-B),sp=y1-y0;
+ let g='';for(let i=0;i<=4;i++){const y=y0+sp*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${Y(y)}" y2="${Y(y)}" stroke="currentColor" opacity=".12"/><text x="${L-4}" y="${Y(y)+3}" font-size="9" text-anchor="end" fill="currentColor" opacity=".7">${sp<20?y.toFixed(1):short(y)}</text>`}
+ for(let i=0;i<=3;i++){const t=x0+(x1-x0)*i/3;g+=`<text x="${X(t)}" y="${H-10}" font-size="9" text-anchor="middle" fill="currentColor" opacity=".7">${new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'2-digit'})}</text>`}
+ const lines=vis.map(x=>`<polyline points="${x.pl.map(q=>X(q[0])+','+Y(q[1])).join(' ')}" fill="none" stroke="${x.c}" stroke-width="2.5"/>`+x.pl.map(q=>`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="3.2" fill="${x.c}"/>`).join('')).join('');
+ $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="color:var(--tx)">${g}${lines}</svg>`;
+ $('lg').innerHTML=(ind?'Multiple series shown indexed to 100 at their first snapshot. Hide others to see actual values.<br>':'')+vis.map(x=>{const f=x.pts[0][1],l=x.pts[x.pts.length-1][1],c=(l-f)/f*100;return`<span style="color:${x.c}">●</span> ${x.n}: ${l.toLocaleString('en-IN',{maximumFractionDigits:2})} (${c>=0?'+':''}${c.toFixed(1)}%)`}).join('<br>')}
+function short(n){const a=Math.abs(n);return a>=1e7?(n/1e7).toFixed(1)+'Cr':a>=1e5?(n/1e5).toFixed(1)+'L':a>=1e3?(n/1e3).toFixed(0)+'k':Math.round(n)}
+async function exp(){const s=await seal(S,pass,salt);const b=new Blob([s],{type:'application/json'});const a=document.createElement('a');
+ a.href=URL.createObjectURL(b);a.download='networth-backup-'+new Date().toISOString().slice(0,10)+'.nwbak';a.click();$('bm').textContent='Backup exported.'}
+async function imp(){const f=$('f').files[0],p=$('bp').value;if(!f||!p){$('bm').textContent='Choose a file and enter its passphrase.';return}
+ try{const r=await open(await f.text(),p);if(!confirm('Replace current data with the backup?'))return;S=r.data;salt=r.salt;pass=p;await migrate();await persist();localStorage.removeItem('nw_bio');render();$('bm').textContent='Imported. Your passphrase is now the backup\'s passphrase. Re-enable fingerprint in Admin.'}
+ catch(e){$('bm').textContent=e.message=='newer'?'This backup was made by a newer app version. Update the app and try again.':'Could not decrypt: wrong passphrase or invalid file.'}}
+
+async function jget(u){const r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(8000)});if(!r.ok)throw 0;return r.json()}
+const num=v=>parseFloat(String(v).replace(/,/g,''));
+async function fx(u){try{return await jget(u)}catch(e){return await jget('https://api.allorigins.win/raw?url='+encodeURIComponent(u))}}
+async function mc(code){const d=(await fx('https://priceapi.moneycontrol.com/pricefeed/notapplicable/inidicesindia/'+code)).data;const p=num(d.pricecurrent);if(!p)throw 0;return{p,pct:num(d.pricepercentchange)}}
+async function nse(name){const i=(await fx('https://www.nseindia.com/api/allIndices')).data.find(x=>x.index===name);const p=num(i.last);if(!p)throw 0;return{p,pct:num(i.percentChange)}}
+async function any(...f){for(const g of f){try{return await g()}catch(e){}}throw 0}
+let MK={};const sd=t=>t&&new Date(t).toDateString()==new Date().toDateString();
+function drawMkt(o){MK=o;const t=(n,x)=>{if(!x)return`<div><span class="mu">${n}</span><b>—</b></div>`;
+ const ch=x.pct??0;return`<div><span class="mu">${n}</span><b>${x.p.toLocaleString('en-IN',{maximumFractionDigits:2})}</b><span class="${ch>=0?'up':'dn'}" style="font-size:12px">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(2)}%</span></div>`};
+ $('mk').innerHTML=t('Sensex',o.sx)+t('Nifty 50',o.nf)+`<div><span class="mu">USD/INR</span><b>${o.usd?'₹'+o.usd.toFixed(2):'—'}</b></div><div onclick="event.stopPropagation();setGold()"><span class="mu">Gold 22K /g ✎</span><b>${o.gold?fmt(o.gold):'tap to set'}</b></div>`;
+ const T=Math.max(o.sx?.t||0,o.nf?.t||0,o.ut||0,o.gt||0);
+ $('mkt').textContent=T?'Moneycontrol/NSE/Goodreturns · as of '+new Date(T).toLocaleString()+(GERR?' · gold fetch failed, tap Gold to enter manually':'')+' · tap to refresh':'Market data unavailable (offline?) · tap to retry'}
+function setGold(){const v=num(prompt('Gold 22K rate in ₹ per gram',MK.gold?Math.round(MK.gold):''));if(v>0){MK.gold=v;MK.gt=Date.now();localStorage.setItem('nw_mkt',JSON.stringify(MK));drawMkt(MK)}}
+let GR=null,GERR=false;
+function norm(h){return h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/&#8377;|&#x20b9;|&rupee;/gi,'₹').replace(/&nbsp;|&#160;/g,' ').replace(/[*|]/g,' ').replace(/\s+/g,' ')}
+function gpage(){if(GR)return GR;const u='https://www.goodreturns.in/gold-rates/mumbai.html';
+ const src=[u,'https://r.jina.ai/'+u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u),'https://corsproxy.io/?url='+encodeURIComponent(u),'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)];
+ return GR=Promise.any(src.map(async x=>{const r=await fetch(x,{cache:'no-store',signal:AbortSignal.timeout(10000)});if(!r.ok)throw 0;const t=norm(await r.text());if(!/24 ?k/i.test(t)||!/gram/i.test(t))throw 0;return t}))}
+async function gold(){const t=await gpage();let v=0;
+ for(const r of [/₹\s*([\d,]+)\s*per gram for 22 ?k/i,/22 ?K Gold\s*\/\s*g\s*₹\s*([\d,]+)/i]){const m=t.match(r);if(m){v=num(m[1]);break}}
+ if(!(v>500&&v<200000))throw 0;return v}
+async function gtick(n){const t=await gpage();const m=t.match(new RegExp(n+'\\s*([\\d,]+\\.\\d+)\\s*(?:([▲▼])\\s*-?([\\d.]+)%)?','i'));if(!m)throw 0;const p=num(m[1]);if(!p)throw 0;return{p,pct:m[2]?(m[2]=='▼'?-1:1)*num(m[3]):0}}
+async function gusd(){const t=await gpage();const m=t.match(/USD\s*₹?\s*(\d+\.\d+)/i);if(!m)throw 0;return num(m[1])}
+async function migrate(){if(S.gv)return;S.entries.forEach(e=>{if(e.mkt&&e.mkt.gold)e.mkt.gold=e.mkt.gold/10*22/24});S.gv=2;await persist()}
+async function loadMkt(){GR=null;let o={};try{o=JSON.parse(localStorage.getItem('nw_mkt')||'{}')}catch(e){}if(o.gu!=='22g'){delete o.gold;delete o.gt;o.gu='22g'}drawMkt(o);$('mkt').textContent='Refreshing…';
+ const r=await Promise.allSettled([
+  any(()=>mc('in%3BSEN'),()=>gtick('Sensex')),
+  any(()=>mc('in%3BNSX'),()=>nse('NIFTY 50'),()=>gtick('Nifty')),
+  any(()=>jget('https://open.er-api.com/v6/latest/USD').then(j=>{if(!(j.rates&&j.rates.INR))throw 0;return j.rates.INR}),gusd),
+  gold()]);const n=Date.now();
+ GERR=r[3].status!='fulfilled';if(r[0].status=='fulfilled')o.sx={...r[0].value,t:n};
+ if(r[1].status=='fulfilled')o.nf={...r[1].value,t:n};
+ if(r[2].status=='fulfilled'){o.usd=r[2].value;o.ut=n}
+ if(r[3].status=='fulfilled'){o.gold=r[3].value;o.gt=n}
+ localStorage.setItem('nw_mkt',JSON.stringify(o));drawMkt(o)}
+
+function idb(){return new Promise((ok,no)=>{const r=indexedDB.open('nwk',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>ok(r.result);r.onerror=no})}
+async function idbSet(k,v){const d=await idb();return new Promise((ok,no)=>{const t=d.transaction('k','readwrite');t.objectStore('k').put(v,k);t.oncomplete=ok;t.onerror=no})}
+async function idbGet(k){const d=await idb();return new Promise((ok,no)=>{const q=d.transaction('k').objectStore('k').get(k);q.onsuccess=()=>ok(q.result);q.onerror=no})}
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+function assertion(id,salt){return navigator.credentials.get({publicKey:{challenge:rnd(32),allowCredentials:[{type:'public-key',id}],userVerification:'required',extensions:{prf:{eval:{first:salt}}}}})}
+function bioUi(){const on=!!localStorage.getItem('nw_bio');
+ $('bs').textContent=on?'Fingerprint unlock is ON. Your passphrase is still required if the fingerprint fails.':'Unlock with your fingerprint instead of typing the passphrase. Needs the app opened from an https address.';
+ $('bb').textContent=on?'Disable fingerprint':'Enable fingerprint'}
+async function bioToggle(){if(localStorage.getItem('nw_bio')){localStorage.removeItem('nw_bio');bioUi();return}
+ try{
+  if(!window.PublicKeyCredential||!location.protocol.startsWith('http')){alert('Fingerprint needs this app to be opened from an https address (not a local file).');return}
+  const cred=await navigator.credentials.create({publicKey:{rp:{name:'Net Worth'},user:{id:rnd(16),name:'owner',displayName:'Owner'},challenge:rnd(32),pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},extensions:{prf:{}}}});
+  const id=new Uint8Array(cred.rawId),salt=rnd(32),a=await assertion(id,salt),prf=a.getClientExtensionResults().prf;let key,m;
+  if(prf&&prf.results&&prf.results.first){key=await crypto.subtle.importKey('raw',prf.results.first,'AES-GCM',false,['encrypt','decrypt']);m='prf'}
+  else{key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await idbSet('wk',key);m='dev'}
+  const iv=rnd(12),ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,E.encode(pass));
+  localStorage.setItem('nw_bio',JSON.stringify({m,id:b64(id),s:b64(salt),iv:b64(iv),ct:b64(ct)}));bioUi();
+  alert(m=='prf'?'Fingerprint enabled.':'Fingerprint enabled (device mode: this browser does not support hardware-bound keys, so protection is weaker than the passphrase).');
+ }catch(e){alert('Could not enable fingerprint: '+(e.name||e))}}
+async function bioUnlock(){try{const b=JSON.parse(localStorage.getItem('nw_bio')),a=await assertion(ub(b.id),ub(b.s));let key;
+  if(b.m=='prf')key=await crypto.subtle.importKey('raw',a.getClientExtensionResults().prf.results.first,'AES-GCM',false,['decrypt']);else key=await idbGet('wk');
+  $('pw').value=D.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(b.iv)},key,ub(b.ct)));await unlock();$('pw').value=''}
+ catch(e){$('le').textContent='Fingerprint failed. Use your passphrase.'}}
+if(v&&localStorage.getItem('nw_bio')){$('bio').classList.remove('hide');setTimeout(bioUnlock,400)}
+const CF=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',weekday:'long',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+function tick(){const p={};CF.formatToParts(new Date()).forEach(x=>p[x.type]=x.value);$('clk').textContent=p.weekday+', '+p.day+'/'+p.month+'/'+p.year+'  '+p.hour+':'+p.minute+':'+p.second+' IST'}
+tick();setInterval(tick,1000);
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x==b));
+ ['u','g','hi','b','ad'].forEach(t=>$(t).classList.toggle('hide',t!=b.dataset.t))});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
